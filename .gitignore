@@ -1,4 +1,6 @@
-.env.local
+# Environment variables
+.env
+.env*.local
 node_modules
 node_modules
 project-plan.md
@@ -7,3 +9,6 @@ analysis.md
 .next/
 # Next.js build cache
 .next/cache/
+# Prisma
+prisma/*.db
+prisma/migrations/dev/
