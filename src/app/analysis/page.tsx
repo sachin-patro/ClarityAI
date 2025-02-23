@@ -2,9 +2,7 @@
 
 import React, { useState } from 'react';
 import CertificateSummaryCard from '@/components/CertificateSummaryCard';
-import InitialAnalysis from '@/components/InitialAnalysis';
 import ChatInterface from '@/components/ChatInterface';
-import QuickPrompts from '@/components/QuickPrompts';
 
 // Mock data - replace with real data from your API
 const mockCertificateData = {
@@ -13,36 +11,52 @@ const mockCertificateData = {
   clarity: 'VS1',
   cut: 'Excellent',
   certificateNumber: 'GIA2345678901',
-  laboratory: 'GIA' as const
-};
-
-const mockAnalysisData = {
-  summary: 'This is an exceptional diamond with excellent proportions and optimal light performance. The combination of D color and VS1 clarity places it in the upper echelon of diamond quality.',
-  strengths: [
-    'D color - the highest color grade possible',
-    'VS1 clarity ensures the diamond is eye-clean',
-    'Excellent cut grade for maximum brilliance'
-  ],
-  concerns: [
-    'Premium pricing due to high color grade',
-    'Slight fluorescence may affect value'
-  ],
-  valueAssessment: 'Given the exceptional quality metrics, this diamond commands a premium price but represents good value for those seeking a top-tier stone.',
-  recommendedQuestions: [
-    'Can you provide images of the diamond under different lighting conditions?',
-    'What is the fluorescence rating?',
-    'Are there any clarity characteristics visible to the naked eye?'
-  ]
+  laboratory: 'GIA' as const,
+  type: 'Natural' as const
 };
 
 interface Message {
   id: string;
   content: string;
   role: 'user' | 'assistant';
+  includeQuickQuestions?: boolean;
 }
 
+// These will be shown as clickable suggestions in the AI's first response
+const QUICK_QUESTIONS = [
+  "Explain the color grade in detail",
+  "Is this diamond eye-clean?",
+  "What's a fair price for this diamond?",
+  "Compare to average diamonds of this size"
+];
+
 export default function AnalysisPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([
+    // Initial AI message with analysis and quick questions
+    {
+      id: 'initial',
+      role: 'assistant',
+      content: `Here's my analysis of your diamond:
+
+Summary:
+This is an exceptional diamond with excellent proportions and optimal light performance. The combination of D color and VS1 clarity places it in the upper echelon of diamond quality.
+
+Key Strengths:
+• D color - the highest color grade possible
+• VS1 clarity ensures the diamond is eye-clean
+• Excellent cut grade for maximum brilliance
+
+Potential Concerns:
+• Premium pricing due to high color grade
+• Slight fluorescence may affect value
+
+Value Assessment:
+Given the exceptional quality metrics, this diamond commands a premium price but represents good value for those seeking a top-tier stone.
+
+What would you like to know more about?`,
+      includeQuickQuestions: true
+    }
+  ]);
   const [isTyping, setIsTyping] = useState(false);
 
   const handleSendMessage = async (content: string) => {
@@ -67,43 +81,23 @@ export default function AnalysisPage() {
     }, 1000);
   };
 
-  const handleQuickPrompt = (prompt: string) => {
-    handleSendMessage(prompt);
-  };
-
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
+    <div className="min-h-screen bg-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Top Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Certificate Summary Card */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Certificate Summary Card - Sidebar */}
           <div className="lg:col-span-1">
             <CertificateSummaryCard specs={mockCertificateData} />
           </div>
           
-          {/* Initial Analysis */}
-          <div className="lg:col-span-2">
-            <InitialAnalysis 
-              isLoading={false}
-              sections={mockAnalysisData}
-            />
-          </div>
-        </div>
-
-        {/* Chat Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Main Chat Area */}
-          <div className="lg:col-span-3 h-[600px]">
+          <div className="lg:col-span-3 h-[800px]">
             <ChatInterface
               messages={messages}
               onSendMessage={handleSendMessage}
               isTyping={isTyping}
+              quickQuestions={QUICK_QUESTIONS}
             />
-          </div>
-          
-          {/* Quick Prompts Sidebar */}
-          <div className="lg:col-span-1">
-            <QuickPrompts onPromptClick={handleQuickPrompt} />
           </div>
         </div>
       </div>

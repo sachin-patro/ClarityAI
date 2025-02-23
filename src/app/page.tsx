@@ -54,18 +54,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* App Name */}
-      <div className="absolute top-6 left-8">
-        <motion.h1 
-          className="text-2xl font-bold text-[#4361ee]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          ClarityAI
-        </motion.h1>
-      </div>
-
       {/* Hero Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
