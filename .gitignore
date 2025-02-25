@@ -5,6 +5,7 @@ node_modules
 node_modules
 project-plan.md
 analysis.md
+test-certificate.txt
 # Next.js build output
 .next/
 # Next.js build cache

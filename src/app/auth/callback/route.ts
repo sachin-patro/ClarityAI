@@ -4,6 +4,12 @@ import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
+  
+  // DEVELOPMENT ONLY: Skip authentication
+  return NextResponse.redirect(new URL('/', requestUrl.origin))
+  
+  // COMMENTED OUT FOR DEVELOPMENT
+  /*
   const code = requestUrl.searchParams.get('code')
 
   if (code) {
@@ -13,4 +19,5 @@ export async function GET(request: Request) {
 
   // URL to redirect to after sign in process completes
   return NextResponse.redirect(new URL('/', requestUrl.origin))
+  */
 } 

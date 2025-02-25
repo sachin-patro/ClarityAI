@@ -52,6 +52,26 @@ export default function Home() {
   const [analysis, setAnalysis] = useState<string>('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
 
+  const handleAnalysisStart = () => {
+    setIsAnalyzing(true)
+    setAnalysis('')
+  }
+
+  const handleAnalysisComplete = (analysisText: string) => {
+    setIsAnalyzing(false)
+    setAnalysis(analysisText)
+    
+    // Scroll to the analysis section
+    if (analysisText) {
+      setTimeout(() => {
+        const analysisSection = document.getElementById('analysis-section')
+        if (analysisSection) {
+          analysisSection.scrollIntoView({ behavior: 'smooth' })
+        }
+      }, 100)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
@@ -96,7 +116,10 @@ export default function Home() {
             animate="animate"
             variants={fadeIn}
           >
-            <CertificateUpload />
+            <CertificateUpload 
+              onAnalysisStart={handleAnalysisStart}
+              onAnalysisComplete={handleAnalysisComplete}
+            />
           </motion.div>
         </div>
       </div>
@@ -138,7 +161,7 @@ export default function Home() {
 
       {/* Analysis Results */}
       {(isAnalyzing || analysis) && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div id="analysis-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

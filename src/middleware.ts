@@ -3,6 +3,12 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
+  // For development purposes, bypass authentication
+  // DEVELOPMENT ONLY: Skip authentication checks
+  return NextResponse.next()
+
+  // COMMENTED OUT FOR DEVELOPMENT
+  /*
   const res = NextResponse.next()
   const supabase = createMiddlewareClient({ req, res })
 
@@ -18,6 +24,7 @@ export async function middleware(req: NextRequest) {
   }
 
   return res
+  */
 }
 
 // Specify which routes should be protected

@@ -46,8 +46,44 @@ export default function DiamondAnalysis({ analysis, isLoading = false }: Diamond
     return null
   }
 
-  // Split the analysis into sections based on numbered headers
-  const sections = analysis.split(/\d+\.\s+/).filter(Boolean)
+  // Try to parse the analysis into sections
+  let sections: { title: string; content: string[] }[] = []
+  
+  try {
+    // First attempt: Split by numbered sections (e.g., "1. Overview")
+    const sectionMatches = analysis.match(/\d+\.\s+[^\n]+/g) || []
+    
+    if (sectionMatches.length >= 3) {
+      // We have numbered sections, split by them
+      const rawSections = analysis.split(/\d+\.\s+[^\n]+/).filter(Boolean)
+      sections = sectionMatches.map((title, index) => {
+        const content = (rawSections[index] || '').split('\n').filter(Boolean)
+        return { title: title.trim(), content }
+      })
+    } else {
+      // Fallback: Split by double newlines as paragraphs
+      const paragraphs = analysis.split('\n\n').filter(Boolean)
+      
+      if (paragraphs.length > 0) {
+        // Use first paragraph as title, rest as content
+        const title = paragraphs[0]
+        const content = paragraphs.slice(1)
+        sections = [{ title, content }]
+      } else {
+        // Last resort: Just use the whole text
+        sections = [{ 
+          title: 'Diamond Analysis', 
+          content: analysis.split('\n').filter(Boolean) 
+        }]
+      }
+    }
+  } catch (error) {
+    // If all parsing fails, just display the raw text
+    sections = [{ 
+      title: 'Diamond Analysis', 
+      content: analysis.split('\n').filter(Boolean) 
+    }]
+  }
 
   return (
     <motion.div
@@ -56,36 +92,33 @@ export default function DiamondAnalysis({ analysis, isLoading = false }: Diamond
       animate="show"
       className="bg-white rounded-xl shadow-lg p-8 space-y-8 border border-gray-100"
     >
-      {sections.map((section, index) => {
-        const [title, ...content] = section.split('\n').filter(Boolean)
-        return (
-          <motion.div
-            key={index}
-            variants={itemVariants}
-            className="space-y-4"
-          >
-            <div className="flex items-center space-x-3">
-              <div className="flex-shrink-0 w-8 h-8 bg-[#4361ee] text-white rounded-full flex items-center justify-center font-semibold">
-                {index + 1}
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900">
-                {title}
-              </h3>
+      {sections.map((section, index) => (
+        <motion.div
+          key={index}
+          variants={itemVariants}
+          className="space-y-4"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="flex-shrink-0 w-8 h-8 bg-[#4361ee] text-white rounded-full flex items-center justify-center font-semibold">
+              {index + 1}
             </div>
-            <div className="ml-11 space-y-3">
-              {content.map((paragraph, pIndex) => (
-                <motion.p
-                  key={pIndex}
-                  variants={itemVariants}
-                  className="text-gray-600 leading-relaxed"
-                >
-                  {paragraph}
-                </motion.p>
-              ))}
-            </div>
-          </motion.div>
-        )
-      })}
+            <h3 className="text-xl font-semibold text-gray-900">
+              {section.title}
+            </h3>
+          </div>
+          <div className="ml-11 space-y-3">
+            {section.content.map((paragraph, pIndex) => (
+              <motion.p
+                key={pIndex}
+                variants={itemVariants}
+                className="text-gray-600 leading-relaxed"
+              >
+                {paragraph}
+              </motion.p>
+            ))}
+          </div>
+        </motion.div>
+      ))}
     </motion.div>
   )
 } 

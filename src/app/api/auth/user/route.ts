@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: Request) {
+  // DEVELOPMENT ONLY: Return a mock user
+  return NextResponse.json({
+    id: 'dev-user-id',
+    email: 'dev@example.com',
+    createdAt: new Date(),
+    updatedAt: new Date()
+  })
+
+  // COMMENTED OUT FOR DEVELOPMENT
+  /*
   try {
     const body = await request.json()
     const { id, email } = body
@@ -24,4 +34,5 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
+  */
 } 

@@ -5,7 +5,15 @@ import { useDropzone, DropzoneOptions } from 'react-dropzone'
 import { ArrowUpTrayIcon } from '@heroicons/react/24/outline'
 import { motion, AnimatePresence } from 'framer-motion'
 
-export default function CertificateUpload() {
+interface CertificateUploadProps {
+  onAnalysisStart?: () => void;
+  onAnalysisComplete?: (analysis: string) => void;
+}
+
+export default function CertificateUpload({ 
+  onAnalysisStart, 
+  onAnalysisComplete 
+}: CertificateUploadProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -20,6 +28,11 @@ export default function CertificateUpload() {
 
     setIsUploading(true)
     setError(null)
+    
+    // Notify parent component that analysis has started
+    if (onAnalysisStart) {
+      onAnalysisStart()
+    }
 
     try {
       const formData = new FormData()
@@ -31,18 +44,50 @@ export default function CertificateUpload() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to analyze certificate')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to analyze certificate')
       }
 
-      // Handle successful upload
-      const result = await response.json()
-      // TODO: Handle the analysis result
+      // For streaming responses, we need to read the text
+      const reader = response.body?.getReader()
+      let analysisText = ''
+      
+      if (reader) {
+        // Process the stream
+        while (true) {
+          const { done, value } = await reader.read()
+          
+          if (done) {
+            break
+          }
+          
+          // Convert the chunk to text and append it
+          const chunk = new TextDecoder().decode(value)
+          analysisText += chunk
+          
+          // Update the analysis as we receive chunks
+          if (onAnalysisComplete) {
+            onAnalysisComplete(analysisText)
+          }
+        }
+      } else {
+        // Fallback for browsers that don't support streaming
+        const analysisText = await response.text()
+        if (onAnalysisComplete) {
+          onAnalysisComplete(analysisText)
+        }
+      }
     } catch (err) {
-      setError('Failed to analyze certificate. Please try again.')
+      console.error('Error analyzing certificate:', err)
+      setError(err instanceof Error ? err.message : 'Failed to analyze certificate. Please try again.')
+      // If there's an error, pass empty analysis to reset the UI
+      if (onAnalysisComplete) {
+        onAnalysisComplete('')
+      }
     } finally {
       setIsUploading(false)
     }
-  }, [])
+  }, [onAnalysisStart, onAnalysisComplete])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -53,10 +98,23 @@ export default function CertificateUpload() {
     multiple: false,
   } as DropzoneOptions)
 
+  // Separate the dropzone props from the motion props to avoid type conflicts
+  const dropzoneProps = getRootProps()
+
   return (
     <div className="bg-gradient-to-r from-[#4361ee]/10 to-transparent p-6 rounded-lg">
       <motion.div
-        {...getRootProps()}
+        // Spread the dropzone props separately to avoid type conflicts
+        onClick={dropzoneProps.onClick}
+        onKeyDown={dropzoneProps.onKeyDown}
+        onFocus={dropzoneProps.onFocus}
+        onBlur={dropzoneProps.onBlur}
+        tabIndex={dropzoneProps.tabIndex}
+        onDragEnter={dropzoneProps.onDragEnter}
+        onDragOver={dropzoneProps.onDragOver}
+        onDragLeave={dropzoneProps.onDragLeave}
+        onDrop={dropzoneProps.onDrop}
+        ref={dropzoneProps.ref}
         className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-all
           ${isDragActive 
             ? 'border-[#4361ee] bg-[#4361ee]/5' 
