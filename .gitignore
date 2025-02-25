@@ -13,3 +13,25 @@ test-certificate.txt
 # Prisma
 prisma/*.db
 prisma/migrations/dev/
+
+# Testing and development files
+src/app/api/test/
+src/app/api/test-route.ts
+src/app/api/simple-test/
+src/app/api/pdf-analysis/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Local development
+.vscode/
+.idea/
+*.swp
+*.swo

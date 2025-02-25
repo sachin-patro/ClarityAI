@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 
 interface DiamondAnalysisProps {
@@ -24,6 +24,58 @@ const itemVariants = {
 }
 
 export default function DiamondAnalysis({ analysis, isLoading = false }: DiamondAnalysisProps) {
+  // State to store processed sections
+  const [processedSections, setProcessedSections] = useState<{ title: string; content: string[] }[]>([])
+
+  // Process the analysis text whenever it changes
+  useEffect(() => {
+    if (!analysis || isLoading) {
+      return;
+    }
+
+    // Try to parse the analysis into sections
+    let sections: { title: string; content: string[] }[] = []
+    
+    try {
+      // First attempt: Split by numbered sections (e.g., "1. Overview")
+      const sectionMatches = analysis.match(/\d+\.\s+[^\n]+/g) || []
+      
+      if (sectionMatches.length >= 3) {
+        // We have numbered sections, split by them
+        const rawSections = analysis.split(/\d+\.\s+[^\n]+/).filter(Boolean)
+        sections = sectionMatches.map((title, index) => {
+          const content = (rawSections[index] || '').split('\n').filter(Boolean)
+          return { title: title.trim(), content }
+        })
+      } else {
+        // Fallback: Split by double newlines as paragraphs
+        const paragraphs = analysis.split('\n\n').filter(Boolean)
+        
+        if (paragraphs.length > 0) {
+          // Use first paragraph as title, rest as content
+          const title = paragraphs[0]
+          const content = paragraphs.slice(1)
+          sections = [{ title, content }]
+        } else {
+          // Last resort: Just use the whole text
+          sections = [{ 
+            title: 'Diamond Analysis', 
+            content: analysis.split('\n').filter(Boolean) 
+          }]
+        }
+      }
+    } catch (error) {
+      console.error('Error processing analysis:', error);
+      // If all parsing fails, just display the raw text
+      sections = [{ 
+        title: 'Diamond Analysis', 
+        content: analysis.split('\n').filter(Boolean) 
+      }]
+    }
+
+    setProcessedSections(sections);
+  }, [analysis, isLoading]);
+
   if (isLoading) {
     return (
       <motion.div 
@@ -46,43 +98,13 @@ export default function DiamondAnalysis({ analysis, isLoading = false }: Diamond
     return null
   }
 
-  // Try to parse the analysis into sections
-  let sections: { title: string; content: string[] }[] = []
-  
-  try {
-    // First attempt: Split by numbered sections (e.g., "1. Overview")
-    const sectionMatches = analysis.match(/\d+\.\s+[^\n]+/g) || []
-    
-    if (sectionMatches.length >= 3) {
-      // We have numbered sections, split by them
-      const rawSections = analysis.split(/\d+\.\s+[^\n]+/).filter(Boolean)
-      sections = sectionMatches.map((title, index) => {
-        const content = (rawSections[index] || '').split('\n').filter(Boolean)
-        return { title: title.trim(), content }
-      })
-    } else {
-      // Fallback: Split by double newlines as paragraphs
-      const paragraphs = analysis.split('\n\n').filter(Boolean)
-      
-      if (paragraphs.length > 0) {
-        // Use first paragraph as title, rest as content
-        const title = paragraphs[0]
-        const content = paragraphs.slice(1)
-        sections = [{ title, content }]
-      } else {
-        // Last resort: Just use the whole text
-        sections = [{ 
-          title: 'Diamond Analysis', 
-          content: analysis.split('\n').filter(Boolean) 
-        }]
-      }
-    }
-  } catch (error) {
-    // If all parsing fails, just display the raw text
-    sections = [{ 
-      title: 'Diamond Analysis', 
-      content: analysis.split('\n').filter(Boolean) 
-    }]
+  // If we have no processed sections but have analysis text, show a simple loading state
+  if (processedSections.length === 0) {
+    return (
+      <div className="text-gray-600">
+        Processing analysis...
+      </div>
+    );
   }
 
   return (
@@ -92,7 +114,7 @@ export default function DiamondAnalysis({ analysis, isLoading = false }: Diamond
       animate="show"
       className="bg-white rounded-xl shadow-lg p-8 space-y-8 border border-gray-100"
     >
-      {sections.map((section, index) => (
+      {processedSections.map((section, index) => (
         <motion.div
           key={index}
           variants={itemVariants}
