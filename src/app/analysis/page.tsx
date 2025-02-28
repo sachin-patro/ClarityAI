@@ -31,6 +31,7 @@ export default function AnalysisPage() {
   const [certificateData, setCertificateData] = useState<CertificateData | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationContext, setConversationContext] = useState<Message[]>([]);
 
   useEffect(() => {
     // Get certificate data from localStorage
@@ -94,21 +95,44 @@ export default function AnalysisPage() {
 
         // Set initial message
         console.log('[Analysis Page] Setting initial message')
-        setMessages([{
+        const initialMessage = {
           id: 'initial',
           content: sections,
-          role: 'assistant',
+          role: 'assistant' as const,
           includeQuickQuestions: true
-        }])
+        };
+        
+        setMessages([initialMessage]);
+        
+        // Also add to conversation context for future API calls
+        setConversationContext([
+          {
+            id: 'system',
+            content: `You are a diamond expert analyzing this certificate. Here's what you know about it:
+            
+Certificate Type: ${data.specs.laboratory} ${data.specs.type} Diamond Certificate
+Certificate Number: ${data.specs.certificateNumber}
+Specifications:
+- Carat: ${data.specs.carat}
+- Color: ${data.specs.color}
+- Clarity: ${data.specs.clarity}
+- Cut: ${data.specs.cut}`,
+            role: 'assistant'
+          },
+          initialMessage
+        ]);
       } catch (err) {
         console.error('[Analysis Page] Error formatting analysis:', err)
         // Fallback to raw analysis if parsing fails
-        setMessages([{
+        const fallbackMessage = {
           id: 'initial',
           content: typeof data.analysis === 'string' ? data.analysis : JSON.stringify(data.analysis, null, 2),
-          role: 'assistant',
+          role: 'assistant' as const,
           includeQuickQuestions: true
-        }])
+        };
+        
+        setMessages([fallbackMessage]);
+        setConversationContext([fallbackMessage]);
       }
 
       // Clear the stored data after a delay to ensure the page has loaded
@@ -153,40 +177,27 @@ export default function AnalysisPage() {
     return questions;
   };
 
-  const handleSendMessage = async (content: string) => {
-    // Add user message
+  const handleSendMessage = (content: string) => {
+    // Add user message to the chat
     const userMessage: Message = {
       id: Date.now().toString(),
       content,
       role: 'user'
     };
+    
     setMessages(prev => [...prev, userMessage]);
     
-    // Set typing indicator
+    // Also add to conversation context
+    setConversationContext(prev => [...prev, userMessage]);
+    
+    // Set typing indicator (will be replaced by streaming)
     setIsTyping(true);
-
-    try {
-      // TODO: Implement actual API call to get AI response
-      // For now, just echo back the message after a delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: `You asked about: ${content}\n\nThis is a placeholder response. The AI integration will be implemented soon.`,
-        role: 'assistant'
-      };
-      
-      setMessages(prev => [...prev, aiMessage]);
-    } catch (err) {
-      console.error('Error getting AI response:', err);
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        content: 'Sorry, I encountered an error. Please try again.',
-        role: 'assistant'
-      }]);
-    } finally {
-      setIsTyping(false);
-    }
+  };
+  
+  const handleNewAssistantMessage = (message: Message) => {
+    setMessages(prev => [...prev, message]);
+    setConversationContext(prev => [...prev, message]);
+    setIsTyping(false);
   };
 
   if (!certificateData) {
@@ -213,6 +224,7 @@ export default function AnalysisPage() {
           <ChatInterface
             messages={messages}
             onSendMessage={handleSendMessage}
+            onNewAssistantMessage={handleNewAssistantMessage}
             isTyping={isTyping}
             quickQuestions={getQuickQuestions()}
             certificateText={certificateData.rawText}

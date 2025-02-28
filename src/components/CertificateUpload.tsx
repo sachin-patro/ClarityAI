@@ -237,7 +237,7 @@ export default function CertificateUpload({
                 Drop your certificate here
               </p>
               <p className="text-[#4361ee]/60 text-sm">
-                Let's analyze your diamond
+                Let&apos;s analyze your diamond
               </p>
             </motion.div>
           ) : apiStatus !== 'available' ? (

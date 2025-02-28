@@ -16,6 +16,7 @@ interface ChatInterfaceProps {
   isTyping: boolean;
   quickQuestions: string[];
   certificateText: string;
+  onNewAssistantMessage?: (message: Message) => void;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -23,9 +24,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onSendMessage,
   isTyping,
   quickQuestions,
-  certificateText
+  certificateText,
+  onNewAssistantMessage
 }) => {
   const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -38,32 +41,55 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim()) {
-      onSendMessage(input.trim());
-      setInput('');
+    if (!input.trim() || isLoading) return;
+    
+    const userMessage = input.trim();
+    onSendMessage(userMessage);
+    setInput('');
+    setIsLoading(true);
+    
+    try {
+      console.log('Sending chat request to API...');
+      
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          certificateText
+        })
+      });
 
-      try {
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: input.trim(),
-            certificateText
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to get AI response');
-        }
-
-        const data = await response.json();
-        onSendMessage(data.response);
-      } catch (err) {
-        console.error('Error getting AI response:', err);
-        onSendMessage('Sorry, I encountered an error. Please try again.');
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status} - ${response.statusText}`);
       }
+
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (onNewAssistantMessage) {
+        onNewAssistantMessage({
+          id: Date.now().toString(),
+          content: data.response,
+          role: 'assistant'
+        });
+      }
+    } catch (err) {
+      console.error('Error getting AI response:', err);
+      if (onNewAssistantMessage) {
+        onNewAssistantMessage({
+          id: Date.now().toString(),
+          content: 'Sorry, I encountered an error. Please try again.',
+          role: 'assistant'
+        });
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -130,8 +156,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     {quickQuestions.map((question, index) => (
                       <button
                         key={index}
-                        onClick={() => onSendMessage(question)}
-                        className="text-sm bg-white text-blue-600 px-3 py-1 rounded-full border border-blue-200 hover:bg-blue-50 transition-colors"
+                        onClick={() => {
+                          if (!isLoading) {
+                            onSendMessage(question);
+                            handleSubmit(new Event('submit') as any);
+                          }
+                        }}
+                        className="text-sm bg-white text-blue-600 px-3 py-1 rounded-full border border-blue-200 hover:bg-blue-50 transition-colors disabled:opacity-50"
+                        disabled={isLoading}
                       >
                         {question}
                       </button>
@@ -143,8 +175,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
         ))}
         
-        {/* Typing indicator */}
-        {isTyping && (
+        {/* Loading indicator */}
+        {isLoading && (
           <div className="mr-12 mb-4">
             <div className="bg-blue-50 text-blue-900 rounded-lg p-4">
               <div className="flex space-x-2">
@@ -168,10 +200,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about the diamond..."
             className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={isLoading}
           />
           <button
             type="submit"
-            disabled={!input.trim()}
+            disabled={!input.trim() || isLoading}
             className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FiSend className="w-5 h-5" />
