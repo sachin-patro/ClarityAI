@@ -39,48 +39,113 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     scrollToBottom();
   }, [messages, isTyping]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, messageOverride?: string) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (isLoading) {
+      console.log('[Chat Interface] Skipping submit - already loading');
+      return;
+    }
+
+    let messageToSend = messageOverride || input.trim();
     
-    const userMessage = input.trim();
-    onSendMessage(userMessage);
+    if (!messageToSend) {
+      console.log('[Chat Interface] No message to send');
+      return;
+    }
+    
+    console.log('[Chat Interface] Sending message:', messageToSend);
+    console.log('[Chat Interface] Current messages:', messages.map(m => ({
+      id: m.id,
+      role: m.role,
+      isInitial: m.includeQuickQuestions,
+      contentPreview: m.content.slice(0, 50)
+    })));
+
     setInput('');
     setIsLoading(true);
+
+    // Notify parent about the user message first
+    onSendMessage(messageToSend);
+
+    // Convert messages to the format expected by the API
+    const conversationHistory = messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
     
     try {
-      console.log('Sending chat request to API...');
-      
+      console.log('[Chat Interface] Making API request with history:', conversationHistory.length);
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: userMessage,
-          certificateText
+          message: messageToSend,
+          certificateText,
+          stream: true,
+          conversationHistory
         })
       });
+
+      console.log('[Chat Interface] API response status:', response.status);
 
       if (!response.ok) {
         throw new Error(`Error: ${response.status} - ${response.statusText}`);
       }
 
-      const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error);
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedResponse = '';
+
+      if (!reader) {
+        throw new Error('No response body');
       }
 
-      if (onNewAssistantMessage) {
-        onNewAssistantMessage({
-          id: Date.now().toString(),
-          content: data.response,
-          role: 'assistant'
-        });
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          console.log('[Chat Interface] Stream complete, final response:', accumulatedResponse.slice(0, 50) + '...');
+          break;
+        }
+
+        // Decode the chunk and accumulate it
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') {
+              continue;
+            }
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices[0]?.delta?.content || '';
+              accumulatedResponse += content;
+              
+              // Update the message in real-time
+              if (content && onNewAssistantMessage) {
+                const newMessage = {
+                  id: Date.now().toString(),
+                  content: accumulatedResponse,
+                  role: 'assistant' as const
+                };
+                console.log('[Chat Interface] Updating assistant message:', {
+                  id: newMessage.id,
+                  contentPreview: newMessage.content.slice(0, 50)
+                });
+                onNewAssistantMessage(newMessage);
+              }
+            } catch (e) {
+              console.error('[Chat Interface] Error parsing chunk:', e);
+            }
+          }
+        }
       }
     } catch (err) {
-      console.error('Error getting AI response:', err);
+      console.error('[Chat Interface] Error in chat request:', err);
       if (onNewAssistantMessage) {
         onNewAssistantMessage({
           id: Date.now().toString(),
@@ -158,8 +223,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         key={index}
                         onClick={() => {
                           if (!isLoading) {
-                            onSendMessage(question);
-                            handleSubmit(new Event('submit') as any);
+                            console.log('[Chat Interface] Quick question clicked:', question);
+                            const syntheticEvent = { preventDefault: () => {} } as React.FormEvent;
+                            handleSubmit(syntheticEvent, question);
                           }
                         }}
                         className="text-sm bg-white text-blue-600 px-3 py-1 rounded-full border border-blue-200 hover:bg-blue-50 transition-colors disabled:opacity-50"

@@ -185,18 +185,62 @@ Specifications:
       role: 'user'
     };
     
+    // Add the new message while preserving all existing messages
     setMessages(prev => [...prev, userMessage]);
     
-    // Also add to conversation context
+    // Update conversation context
     setConversationContext(prev => [...prev, userMessage]);
-    
-    // Set typing indicator (will be replaced by streaming)
     setIsTyping(true);
   };
   
   const handleNewAssistantMessage = (message: Message) => {
-    setMessages(prev => [...prev, message]);
-    setConversationContext(prev => [...prev, message]);
+    setMessages(prev => {
+      console.log('[Analysis Page] Current messages:', prev.map(m => ({
+        id: m.id,
+        role: m.role,
+        isInitial: m.includeQuickQuestions,
+        contentPreview: m.content.slice(0, 50)
+      })));
+
+      // Find the last non-initial assistant message
+      const lastAssistantIndex = [...prev].reverse().findIndex(m => 
+        m.role === 'assistant' && !m.includeQuickQuestions
+      );
+      
+      console.log('[Analysis Page] Last assistant index:', lastAssistantIndex);
+      
+      if (lastAssistantIndex >= 0) {
+        // Convert back to normal array index
+        const actualIndex = prev.length - 1 - lastAssistantIndex;
+        console.log('[Analysis Page] Updating message at index:', actualIndex);
+        
+        // Replace the last assistant message with the new one
+        const newMessages = [...prev];
+        newMessages[actualIndex] = message;
+        return newMessages;
+      }
+      
+      console.log('[Analysis Page] Appending new assistant message');
+      // If no assistant message found, append the new one
+      return [...prev, message];
+    });
+    
+    setConversationContext(prev => {
+      console.log('[Analysis Page] Updating conversation context, current length:', prev.length);
+      // Similarly update the conversation context
+      const lastAssistantIndex = [...prev].reverse().findIndex(m => 
+        m.role === 'assistant' && !m.includeQuickQuestions
+      );
+      
+      if (lastAssistantIndex >= 0) {
+        const actualIndex = prev.length - 1 - lastAssistantIndex;
+        const newContext = [...prev];
+        newContext[actualIndex] = message;
+        return newContext;
+      }
+      return [...prev, message];
+    });
+    
     setIsTyping(false);
   };
 

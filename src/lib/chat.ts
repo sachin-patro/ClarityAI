@@ -8,6 +8,8 @@ const openaiConfig = new Configuration({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+console.log('[Chat Lib] OpenAI API Key present:', !!process.env.OPENAI_API_KEY);
+
 export const openai = new OpenAIApi(openaiConfig);
 
 export interface ChatMessage {
@@ -19,6 +21,7 @@ export interface ChatRequestBody {
   message: string;
   certificateText: string;
   stream?: boolean;
+  conversationHistory?: ChatMessage[];
 }
 
 export function createSystemMessage(certificateText: string): string {
@@ -34,19 +37,38 @@ If information is not available in the certificate, clearly state that.
 Keep responses concise but informative.`;
 }
 
-export async function createChatCompletion(message: string, certificateText: string, stream: boolean = false) {
+export async function createChatCompletion(
+  message: string, 
+  certificateText: string, 
+  stream: boolean = false,
+  conversationHistory: ChatMessage[] = []
+) {
+  console.log('[Chat Lib] Creating chat completion:', { stream, hasHistory: conversationHistory.length > 0 });
   const systemMessage = createSystemMessage(certificateText);
   
-  return await openai.createChatCompletion({
-    model: 'gpt-4-turbo-preview',
-    messages: [
-      { role: 'system', content: systemMessage },
-      { role: 'user', content: message }
-    ],
-    temperature: 0.7,
-    max_tokens: 800,
-    stream: stream
-  });
+  try {
+    // Build the messages array with conversation history
+    const messages = [
+      { role: 'system' as const, content: systemMessage },
+      ...conversationHistory,
+      { role: 'user' as const, content: message }
+    ];
+
+    console.log('[Chat Lib] Sending messages to OpenAI:', messages.length);
+    
+    const response = await openai.createChatCompletion({
+      model: 'gpt-4-turbo-preview',
+      messages,
+      temperature: 0.7,
+      max_tokens: 800,
+      stream: stream
+    });
+    console.log('[Chat Lib] OpenAI response received:', { status: response.status });
+    return response;
+  } catch (error) {
+    console.error('[Chat Lib] OpenAI API error:', error);
+    throw error;
+  }
 }
 
 export async function processStream(
