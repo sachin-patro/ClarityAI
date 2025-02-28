@@ -15,13 +15,15 @@ interface ChatInterfaceProps {
   onSendMessage: (message: string) => void;
   isTyping: boolean;
   quickQuestions: string[];
+  certificateText: string;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
   messages,
   onSendMessage,
   isTyping,
-  quickQuestions
+  quickQuestions,
+  certificateText
 }) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -34,11 +36,34 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     scrollToBottom();
   }, [messages, isTyping]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (input.trim()) {
       onSendMessage(input.trim());
       setInput('');
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: input.trim(),
+            certificateText
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to get AI response');
+        }
+
+        const data = await response.json();
+        onSendMessage(data.response);
+      } catch (err) {
+        console.error('Error getting AI response:', err);
+        onSendMessage('Sorry, I encountered an error. Please try again.');
+      }
     }
   };
 
@@ -48,104 +73,108 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     
     return lines.map((line, index) => {
       // Handle bullet points
-      if (line.startsWith('•')) {
+      if (line.trim().startsWith('•')) {
         return (
-          <li key={index} className="ml-6 text-gray-700">
-            {line.substring(1).trim()}
-          </li>
+          <div key={index} className="flex space-x-2 ml-4 mb-2">
+            <span className="text-blue-500">•</span>
+            <span>{line.trim().substring(1)}</span>
+          </div>
         );
       }
       
-      // Handle section headers
-      if (line.endsWith(':')) {
+      // Handle numbered sections (e.g., "1. Overview")
+      if (/^\d+\./.test(line)) {
         return (
-          <h4 key={index} className="font-semibold text-gray-900 mt-4 mb-2">
-            {line}
-          </h4>
+          <h3 key={index} className="font-semibold text-lg mt-4 mb-2">
+            {line.trim()}
+          </h3>
         );
       }
       
       // Regular text
-      return line.trim() && (
-        <p key={index} className="text-gray-700 mb-2">
+      return line.trim() ? (
+        <p key={index} className="mb-2">
           {line}
         </p>
-      );
+      ) : null;
     });
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg shadow-lg">
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="space-y-6 p-4">
-          {messages.map((message) => (
+    <div className="bg-white rounded-lg shadow-lg h-[800px] flex flex-col">
+      {/* Messages container */}
+      <div className="flex-1 overflow-y-auto p-6">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`mb-4 ${
+              message.role === 'assistant' ? 'mr-12' : 'ml-12'
+            }`}
+          >
             <div
-              key={message.id}
-              className={`flex ${
-                message.role === 'user' ? 'justify-end' : 'justify-start'
+              className={`rounded-lg p-4 ${
+                message.role === 'assistant'
+                  ? 'bg-blue-50 text-blue-900'
+                  : 'bg-gray-100 text-gray-900'
               }`}
             >
-              <div
-                className={`max-w-[85%] ${
-                  message.role === 'user'
-                    ? 'bg-blue-500 text-white rounded-2xl rounded-tr-sm px-4 py-2'
-                    : 'text-gray-800'
-                }`}
-              >
-                {formatMessageContent(message.content)}
+              {formatMessageContent(message.content)}
+              
+              {/* Quick questions */}
+              {message.includeQuickQuestions && quickQuestions.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-blue-200">
+                  <p className="text-sm text-blue-600 mb-2">
+                    Quick questions you can ask:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {quickQuestions.map((question, index) => (
+                      <button
+                        key={index}
+                        onClick={() => onSendMessage(question)}
+                        className="text-sm bg-white text-blue-600 px-3 py-1 rounded-full border border-blue-200 hover:bg-blue-50 transition-colors"
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        
+        {/* Typing indicator */}
+        {isTyping && (
+          <div className="mr-12 mb-4">
+            <div className="bg-blue-50 text-blue-900 rounded-lg p-4">
+              <div className="flex space-x-2">
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce delay-100" />
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce delay-200" />
               </div>
             </div>
-          ))}
-          
-          {isTyping && (
-            <div className="flex justify-start">
-              <div className="flex space-x-2 px-4 py-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-              </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
+          </div>
+        )}
+        
+        <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Questions */}
-      <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
-        <div className="grid grid-cols-2 gap-2">
-          {quickQuestions.map((question, index) => (
-            <button
-              key={index}
-              onClick={() => onSendMessage(question)}
-              className="text-left px-4 py-3 bg-white rounded-xl border border-gray-200 
-                       hover:border-gray-300 transition-colors duration-200 shadow-sm
-                       text-sm text-gray-700 hover:bg-gray-50"
-            >
-              {question}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Input Form */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200">
-        <div className="flex space-x-2">
+      {/* Input form */}
+      <form onSubmit={handleSubmit} className="p-4 border-t">
+        <div className="flex space-x-4">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Ask about the diamond..."
+            className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
             type="submit"
             disabled={!input.trim()}
-            className="px-4 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 
-                     disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
+            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <FiSend />
+            <FiSend className="w-5 h-5" />
           </button>
         </div>
       </form>

@@ -23,7 +23,13 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  console.log('Request received at /api/analyze')
+  console.log('Request received at /api/analyze:', req.method)
+
+  // Handle OPTIONS request for CORS and API availability check
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Allow', 'OPTIONS, POST')
+    return res.status(200).end()
+  }
   
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -92,19 +98,37 @@ export default async function handler(
 
     try {
       // Prepare the prompt for OpenAI
-      const prompt = `You are an expert diamond analyst. Analyze this diamond certificate and provide a detailed but easy-to-understand explanation of the diamond's characteristics. Focus on the 4Cs (Cut, Color, Clarity, and Carat) and highlight any notable features or concerns. Also suggest questions the buyer should ask the jeweler.
+      const prompt = `You are an expert diamond analyst. First, extract the key specifications from this certificate, then provide a detailed analysis.
 
 Certificate text:
 ${certificateText}
 
-Please structure your response in the following sections:
-1. Overview - A brief summary of the diamond's key characteristics
-2. Detailed Analysis of 4Cs - Break down each of the 4Cs and explain what they mean for this specific diamond
-3. Notable Features - Highlight any special characteristics or unique aspects
-4. Potential Concerns - Point out any areas that might need attention or further investigation
-5. Questions for the Jeweler - Suggest specific questions based on the certificate details
+Please structure your response in JSON format with the following sections:
+{
+  "specifications": {
+    "carat": "numeric value",
+    "color": "letter grade",
+    "clarity": "clarity grade",
+    "cut": "cut grade",
+    "certificateNumber": "number",
+    "laboratory": "GIA or IGI",
+    "type": "Natural or Lab-Grown"
+  },
+  "analysis": {
+    "overview": "Brief summary of key characteristics",
+    "detailedAnalysis": {
+      "cut": "Explanation of cut grade",
+      "color": "Explanation of color grade",
+      "clarity": "Explanation of clarity grade",
+      "carat": "Explanation of carat weight"
+    },
+    "notableFeatures": ["List of special characteristics"],
+    "potentialConcerns": ["List of areas needing attention"],
+    "questionsForJeweler": ["List of suggested questions"]
+  }
+}
 
-For each section, use plain language that a non-expert can understand. If you notice any unusual or noteworthy specifications, explain their significance.`
+Extract all specifications precisely as they appear in the certificate. For the analysis sections, use plain language that a non-expert can understand. If you notice any unusual or noteworthy specifications, explain their significance.`
 
       // Call OpenAI API
       console.log('Calling OpenAI API...')
@@ -119,15 +143,16 @@ For each section, use plain language that a non-expert can understand. If you no
           messages: [
             {
               role: 'system',
-              content: 'You are an expert diamond analyst helping customers understand diamond certificates.',
+              content: 'You are an expert diamond analyst helping customers understand diamond certificates. Always return responses in valid JSON format.',
             },
             {
               role: 'user',
               content: prompt,
             },
           ],
-          temperature: 0.7,
+          temperature: 0.5, // Reduced temperature for more consistent JSON output
           max_tokens: 2000,
+          response_format: { type: "json_object" } // Ensure JSON response
         }),
       })
 
@@ -136,15 +161,31 @@ For each section, use plain language that a non-expert can understand. If you no
       }
 
       const result = await completion.json()
-      const analysis = result.choices[0].message.content
-
-      // Return both the analysis and the raw text
-      return res.status(200).json({
-        message: 'Certificate analyzed successfully',
-        analysis: analysis,
-        textLength: certificateText.length,
-        textPreview: certificateText.substring(0, 500),
-      })
+      console.log('OpenAI API Response:', result)
+      
+      try {
+        // Parse the JSON string from the message content
+        const analysisJson = JSON.parse(result.choices[0].message.content)
+        console.log('Parsed analysis:', analysisJson)
+        
+        // Return both the structured analysis and the raw text
+        return res.status(200).json({
+          message: 'Certificate analyzed successfully',
+          // Convert the analysis object to a formatted string for the chat interface
+          analysis: JSON.stringify(analysisJson.analysis, null, 2),
+          specifications: analysisJson.specifications,
+          textLength: certificateText.length,
+          textPreview: certificateText.substring(0, 500),
+        })
+      } catch (parseError) {
+        console.error('Error parsing OpenAI response:', parseError)
+        console.error('Raw response content:', result.choices[0]?.message?.content)
+        return res.status(500).json({
+          error: 'Failed to parse AI analysis. Please try again.',
+          textLength: certificateText.length,
+          textPreview: certificateText.substring(0, 500),
+        })
+      }
     } catch (openaiError) {
       console.error('Error calling OpenAI API:', openaiError)
       return res.status(500).json({

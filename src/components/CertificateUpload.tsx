@@ -4,87 +4,29 @@ import React, { useCallback, useState, useEffect } from 'react'
 import { useDropzone, DropzoneOptions } from 'react-dropzone'
 import { ArrowUpTrayIcon } from '@heroicons/react/24/outline'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 
 interface CertificateUploadProps {
   onAnalysisStart?: () => void;
-  onAnalysisComplete?: (analysis: string) => void;
 }
 
 export default function CertificateUpload({ 
-  onAnalysisStart, 
-  onAnalysisComplete 
+  onAnalysisStart 
 }: CertificateUploadProps) {
+  const router = useRouter()
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<string | null>(null)
   const [apiStatus, setApiStatus] = useState<'checking' | 'available' | 'unavailable'>('checking')
-  const [routeTestResults, setRouteTestResults] = useState<string[]>([])
 
-  // Check API availability on component mount and test routes
+  // Check API availability on component mount
   useEffect(() => {
     const checkApiStatus = async () => {
-      const results: string[] = [];
-      
       try {
-        // Test the first route format
-        try {
-          console.log('Testing /api/test-route...');
-          const testRouteResponse = await fetch('/api/test-route');
-          const testRouteStatus = testRouteResponse.status;
-          results.push(`/api/test-route: ${testRouteStatus} ${testRouteResponse.statusText}`);
-          console.log(`/api/test-route response:`, testRouteStatus, testRouteResponse.statusText);
-        } catch (err) {
-          results.push(`/api/test-route: Error - ${err}`);
-          console.error('Error testing /api/test-route:', err);
-        }
-        
-        // Test the second route format
-        try {
-          console.log('Testing /api/simple-test...');
-          const simpleTestResponse = await fetch('/api/simple-test');
-          const simpleTestStatus = simpleTestResponse.status;
-          results.push(`/api/simple-test: ${simpleTestStatus} ${simpleTestResponse.statusText}`);
-          console.log(`/api/simple-test response:`, simpleTestStatus, simpleTestResponse.statusText);
-        } catch (err) {
-          results.push(`/api/simple-test: Error - ${err}`);
-          console.error('Error testing /api/simple-test:', err);
-        }
-        
-        // Test the original route
-        try {
-          console.log('Testing /api/pdf-analysis with OPTIONS...');
-          const optionsResponse = await fetch('/api/pdf-analysis', { method: 'OPTIONS' });
-          results.push(`/api/pdf-analysis OPTIONS: ${optionsResponse.status} ${optionsResponse.statusText}`);
-          console.log(`/api/pdf-analysis OPTIONS response:`, optionsResponse.status, optionsResponse.statusText);
-        } catch (err) {
-          results.push(`/api/pdf-analysis OPTIONS: Error - ${err}`);
-          console.error('Error testing /api/pdf-analysis with OPTIONS:', err);
-        }
-        
-        // Test the pages API route
-        try {
-          console.log('Testing /api/analyze with OPTIONS...');
-          const pagesResponse = await fetch('/api/analyze', { method: 'OPTIONS' });
-          results.push(`/api/analyze OPTIONS: ${pagesResponse.status} ${pagesResponse.statusText}`);
-          console.log(`/api/analyze OPTIONS response:`, pagesResponse.status, pagesResponse.statusText);
-        } catch (err) {
-          results.push(`/api/analyze OPTIONS: Error - ${err}`);
-          console.error('Error testing /api/analyze with OPTIONS:', err);
-        }
-        
-        // Set the results
-        setRouteTestResults(results);
-        
-        // Original API test
-        const response = await fetch('/api/test');
+        // Test the API endpoint
+        const response = await fetch('/api/analyze', { method: 'OPTIONS' });
         if (response.ok) {
-          const data = await response.json();
-          console.log('API test response:', data);
           setApiStatus('available');
-          
-          if (!data.openaiKeyAvailable) {
-            setError('OpenAI API key is not configured. Please set the OPENAI_API_KEY environment variable.');
-          }
         } else {
           console.error('API test failed:', response.status, response.statusText);
           setApiStatus('unavailable');
@@ -131,16 +73,17 @@ export default function CertificateUpload({
       formData.append('file', file)
 
       // Send request to analyze endpoint
-      console.log('Sending request to /api/analyze')
+      console.log('[Upload Flow] Starting analysis request')
       const response = await fetch('/api/analyze', {
         method: 'POST',
         body: formData,
       })
 
-      console.log('Response received:', response.status, response.statusText)
+      console.log('[Upload Flow] Response status:', response.status, response.statusText)
+      console.log('[Upload Flow] Response headers:', Object.fromEntries(response.headers.entries()))
       
       if (!response.ok) {
-        // Try to parse as JSON, but handle non-JSON responses gracefully
+        // Handle error response
         let errorMessage = 'Failed to analyze certificate';
         let debugMessage = `Status: ${response.status} ${response.statusText}`;
         
@@ -152,32 +95,6 @@ export default function CertificateUpload({
             const errorData = await response.json();
             errorMessage = errorData.error || errorMessage;
             debugMessage += `, Error: ${JSON.stringify(errorData)}`;
-            
-            // If we have a text preview despite the error, show it
-            if (errorData.textPreview) {
-              const fallbackAnalysis = `
-1. Overview
-Failed to get AI analysis, but here's the extracted text:
-
-${errorData.textPreview}
-
-2. Detailed Analysis of 4Cs
-AI analysis unavailable.
-
-3. Notable Features
-Text extraction successful with ${errorData.textLength} characters.
-
-4. Potential Concerns
-Unable to perform AI analysis. Please try again later.
-
-5. Questions for the Jeweler
-Please ask about the details mentioned in the certificate.
-              `;
-              
-              if (onAnalysisComplete) {
-                onAnalysisComplete(fallbackAnalysis);
-              }
-            }
           } else {
             // Not JSON, try to get the response text
             const responseText = await response.text();
@@ -202,51 +119,43 @@ Please ask about the details mentioned in the certificate.
       }
 
       // Parse the JSON response
-      const responseData = await response.json();
-      console.log('Analysis response:', responseData);
+      const responseData = await response.json()
+      console.log('[Upload Flow] Full API Response:', responseData)
+
+      // Validate the response structure
+      if (!responseData.analysis || !responseData.specifications) {
+        console.error('[Upload Flow] Invalid response structure:', responseData)
+        throw new Error('Invalid response from server. Missing analysis or specifications.')
+      }
+
+      // Store the certificate data and analysis in localStorage
+      const certificateData = {
+        analysis: responseData.analysis,
+        specs: responseData.specifications,
+        rawText: responseData.textPreview
+      }
+      console.log('[Upload Flow] Certificate data to store:', certificateData)
       
-      // Use the AI analysis if available, otherwise fall back to the text preview
-      if (responseData.analysis) {
-        if (onAnalysisComplete) {
-          onAnalysisComplete(responseData.analysis);
-        }
-      } else if (responseData.textPreview) {
-        const fallbackAnalysis = `
-1. Overview
-This is a diamond certificate with the following text extracted:
-
-${responseData.textPreview}
-
-2. Detailed Analysis of 4Cs
-AI analysis unavailable.
-
-3. Notable Features
-Text extraction successful with ${responseData.textLength} characters.
-
-4. Potential Concerns
-None at this stage.
-
-5. Questions for the Jeweler
-Ask about the details mentioned in the certificate.
-        `;
+      try {
+        localStorage.setItem('certificateData', JSON.stringify(certificateData))
+        console.log('[Upload Flow] Data stored in localStorage successfully')
         
-        if (onAnalysisComplete) {
-          onAnalysisComplete(fallbackAnalysis);
-        }
-      } else {
-        throw new Error('No analysis or text preview in the response');
+        // Add a small delay before redirecting to ensure localStorage is updated
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        console.log('[Upload Flow] Redirecting to analysis page...')
+        router.push('/analysis')
+      } catch (storageError) {
+        console.error('[Upload Flow] Error storing data:', storageError)
+        throw new Error('Failed to store certificate data. Please try again.')
       }
     } catch (err) {
-      console.error('Error analyzing certificate:', err)
+      console.error('[Upload Flow] Error in upload process:', err)
       setError(err instanceof Error ? err.message : 'Failed to analyze certificate. Please try again.')
-      // If there's an error, pass empty analysis to reset the UI
-      if (onAnalysisComplete) {
-        onAnalysisComplete('')
-      }
     } finally {
       setIsUploading(false)
     }
-  }, [onAnalysisStart, onAnalysisComplete, apiStatus])
+  }, [onAnalysisStart, apiStatus, router])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -277,20 +186,6 @@ Ask about the details mentioned in the certificate.
 
   return (
     <div className="bg-gradient-to-r from-[#4361ee]/10 to-transparent p-6 rounded-lg">
-      {/* Route test results */}
-      {routeTestResults.length > 0 && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
-          <details>
-            <summary className="cursor-pointer font-medium">API Route Tests</summary>
-            <ul className="mt-2 space-y-1">
-              {routeTestResults.map((result, index) => (
-                <li key={index}>{result}</li>
-              ))}
-            </ul>
-          </details>
-        </div>
-      )}
-      
       <motion.div
         // Spread the dropzone props separately to avoid type conflicts
         onClick={dropzoneProps.onClick}
@@ -421,4 +316,79 @@ Ask about the details mentioned in the certificate.
       </AnimatePresence>
     </div>
   )
+}
+
+// Helper function to extract diamond specifications from certificate text
+function extractSpecs(text: string) {
+  console.log('[Spec Extraction] Starting spec extraction from text:', text.substring(0, 200) + '...')
+  
+  const specs = {
+    carat: 0,
+    color: '',
+    clarity: '',
+    cut: '',
+    certificateNumber: '',
+    laboratory: '' as 'GIA' | 'IGI',
+    type: '' as 'Natural' | 'Lab-Grown'
+  };
+
+  // First determine the laboratory
+  if (text.includes('GIA')) {
+    specs.laboratory = 'GIA';
+  } else if (text.includes('IGI')) {
+    specs.laboratory = 'IGI';
+  }
+
+  // Extract values using regex patterns
+  // Look for weight/carat with various formats
+  const caratMatch = text.match(/(?:weight|carat)\D*(\d+\.\d+)\s*(?:carat|ct\.?|cts\.?)?/i) ||
+                    text.match(/(\d+\.\d+)\s*(?:carat|ct\.?|cts\.?)/i);
+  console.log('[Spec Extraction] Carat match attempt:', caratMatch?.[1])
+  if (caratMatch) specs.carat = parseFloat(caratMatch[1]);
+
+  // Look for color with various formats
+  const colorMatch = text.match(/(?:color[^A-Z]*)(D|E|F|G|H|I|J|K)\b/i) ||
+                    text.match(/\b(D|E|F|G|H|I|J|K)(?:\s*color)/i);
+  console.log('[Spec Extraction] Color match attempt:', colorMatch?.[1])
+  if (colorMatch) specs.color = colorMatch[1].toUpperCase();
+
+  // Look for clarity with various formats
+  const clarityMatch = text.match(/(?:clarity[^A-Z]*)(FL|IF|VVS1|VVS2|VS1|VS2|SI1|SI2|I1|I2|I3)\b/i) ||
+                      text.match(/\b(FL|IF|VVS1|VVS2|VS1|VS2|SI1|SI2|I1|I2|I3)(?:\s*clarity)?/i);
+  console.log('[Spec Extraction] Clarity match attempt:', clarityMatch?.[1])
+  if (clarityMatch) specs.clarity = clarityMatch[1].toUpperCase();
+
+  // Look for cut grade with various formats
+  const cutMatch = text.match(/(?:cut[^A-Z]*)(Excellent|Very Good|Good|Fair|Poor)\b/i) ||
+                  text.match(/\b(Excellent|Very Good|Good|Fair|Poor)(?:\s*cut)?/i);
+  console.log('[Spec Extraction] Cut match attempt:', cutMatch?.[1])
+  if (cutMatch) specs.cut = cutMatch[1];
+
+  // Look for certificate number in various formats
+  const certNumberMatch = text.match(/(?:number|no\.?|#|report)\s*:?\s*(?:GIA|IGI)?\s*(\d[\d-]*\d)/i) || 
+                         text.match(/\b(?:GIA|IGI)\s*(?:number|no\.?|#|report)?\s*:?\s*(\d[\d-]*\d)/i) ||
+                         text.match(/\b(\d{10})\b/); // GIA often uses 10-digit numbers
+  console.log('[Spec Extraction] Certificate number match attempt:', certNumberMatch?.[1])
+  if (certNumberMatch) {
+    specs.certificateNumber = certNumberMatch[1].replace(/[-\s]/g, '');
+  }
+
+  // Look for type indicators with more variations
+  const typeMatch = text.match(/\b(Lab(?:oratory)?[\s-]Grown|Natural|Type\s*(?:IIa?|IIb|Ia|Ib)|Synthetic|Man-Made)\b/i);
+  console.log('[Spec Extraction] Type match attempt:', typeMatch?.[1])
+  if (typeMatch?.[1]) {
+    const matchedType = typeMatch[1].toLowerCase();
+    if (matchedType.includes('lab') || matchedType.includes('grown') || 
+        matchedType.includes('synthetic') || matchedType.includes('man-made')) {
+      specs.type = 'Lab-Grown';
+    } else {
+      specs.type = 'Natural';
+    }
+  } else {
+    // Set a default type if no match is found
+    specs.type = text.toLowerCase().includes('laboratory') ? 'Lab-Grown' : 'Natural';
+  }
+
+  console.log('[Spec Extraction] Final extracted specs:', specs)
+  return specs;
 } 

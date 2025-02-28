@@ -1,9 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import CertificateUpload from '../components/CertificateUpload'
-import DiamondAnalysis from '../components/DiamondAnalysis'
 
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
@@ -49,44 +48,11 @@ const steps = [
 ]
 
 export default function Home() {
-  const [analysis, setAnalysis] = useState<string>('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const handleAnalysisStart = () => {
     setIsAnalyzing(true)
-    setAnalysis('')
-    setError(null)
   }
-
-  const handleAnalysisComplete = (analysisText: string) => {
-    if (analysisText) {
-      setAnalysis(analysisText)
-      
-      // Only set isAnalyzing to false when we have a complete analysis
-      // This helps with streaming responses
-      if (analysisText.includes('Questions for the Jeweler') || 
-          analysisText.length > 500) {
-        setIsAnalyzing(false)
-      }
-    } else {
-      // If we get an empty response, it's likely an error
-      setIsAnalyzing(false)
-      setError('Failed to analyze the certificate. Please try again.')
-    }
-  }
-
-  // Effect to scroll to analysis section when analysis is complete
-  useEffect(() => {
-    if (analysis && !isAnalyzing) {
-      setTimeout(() => {
-        const analysisSection = document.getElementById('analysis-section')
-        if (analysisSection) {
-          analysisSection.scrollIntoView({ behavior: 'smooth' })
-        }
-      }, 100)
-    }
-  }, [analysis, isAnalyzing])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -132,10 +98,7 @@ export default function Home() {
             animate="animate"
             variants={fadeIn}
           >
-            <CertificateUpload 
-              onAnalysisStart={handleAnalysisStart}
-              onAnalysisComplete={handleAnalysisComplete}
-            />
+            <CertificateUpload onAnalysisStart={handleAnalysisStart} />
           </motion.div>
         </div>
       </div>
@@ -174,26 +137,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-      {/* Analysis Results */}
-      {(isAnalyzing || analysis) && (
-        <div id="analysis-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="bg-white p-8 rounded-xl shadow-lg"
-          >
-            <h2 className="text-2xl font-semibold mb-4">Analysis Results</h2>
-            {error ? (
-              <div className="text-red-500 bg-red-50 p-4 rounded-lg">
-                {error}
-              </div>
-            ) : (
-              <DiamondAnalysis analysis={analysis} isLoading={isAnalyzing} />
-            )}
-          </motion.div>
-        </div>
-      )}
     </div>
   )
 } 

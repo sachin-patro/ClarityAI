@@ -1,19 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import CertificateSummaryCard from '@/components/CertificateSummaryCard';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import ChatInterface from '@/components/ChatInterface';
-
-// Mock data - replace with real data from your API
-const mockCertificateData = {
-  carat: 1.01,
-  color: 'D',
-  clarity: 'VS1',
-  cut: 'Excellent',
-  certificateNumber: 'GIA2345678901',
-  laboratory: 'GIA' as const,
-  type: 'Natural' as const
-};
+import CertificateSummaryCard from '@/components/CertificateSummaryCard';
 
 interface Message {
   id: string;
@@ -22,42 +12,146 @@ interface Message {
   includeQuickQuestions?: boolean;
 }
 
-// These will be shown as clickable suggestions in the AI's first response
-const QUICK_QUESTIONS = [
-  "Explain the color grade in detail",
-  "Is this diamond eye-clean?",
-  "What's a fair price for this diamond?",
-  "Compare to average diamonds of this size"
-];
+interface CertificateData {
+  analysis: string;
+  specs: {
+    carat: number;
+    color: string;
+    clarity: string;
+    cut: string;
+    certificateNumber: string;
+    laboratory: 'GIA' | 'IGI';
+    type: 'Natural' | 'Lab-Grown';
+  };
+  rawText: string;
+}
 
 export default function AnalysisPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    // Initial AI message with analysis and quick questions
-    {
-      id: 'initial',
-      role: 'assistant',
-      content: `Here's my analysis of your diamond:
-
-Summary:
-This is an exceptional diamond with excellent proportions and optimal light performance. The combination of D color and VS1 clarity places it in the upper echelon of diamond quality.
-
-Key Strengths:
-• D color - the highest color grade possible
-• VS1 clarity ensures the diamond is eye-clean
-• Excellent cut grade for maximum brilliance
-
-Potential Concerns:
-• Premium pricing due to high color grade
-• Slight fluorescence may affect value
-
-Value Assessment:
-Given the exceptional quality metrics, this diamond commands a premium price but represents good value for those seeking a top-tier stone.
-
-What would you like to know more about?`,
-      includeQuickQuestions: true
-    }
-  ]);
+  const router = useRouter();
+  const [certificateData, setCertificateData] = useState<CertificateData | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    // Get certificate data from localStorage
+    console.log('[Analysis Page] Initializing analysis page')
+    const storedData = localStorage.getItem('certificateData')
+    console.log('[Analysis Page] Found stored data:', !!storedData)
+    
+    if (!storedData) {
+      console.log('[Analysis Page] No certificate data found, redirecting to home')
+      router.push('/')
+      return
+    }
+
+    try {
+      const data = JSON.parse(storedData) as CertificateData
+      console.log('[Analysis Page] Parsed certificate data:', {
+        hasAnalysis: !!data.analysis,
+        analysisLength: data.analysis?.length,
+        hasSpecs: !!data.specs,
+        specsKeys: Object.keys(data.specs || {}),
+        rawTextLength: data.rawText?.length
+      })
+
+      if (!data.analysis || !data.specs || !data.rawText) {
+        console.error('[Analysis Page] Invalid certificate data structure')
+        router.push('/')
+        return
+      }
+      
+      setCertificateData(data)
+
+      // Format the initial AI message
+      try {
+        // Parse the analysis JSON if it's a string
+        const analysisObj = typeof data.analysis === 'string' ? JSON.parse(data.analysis) : data.analysis
+        
+        // Create a formatted message from the analysis object
+        const sections = [
+          // Overview section
+          analysisObj.overview,
+          
+          // Detailed Analysis section
+          '\nDetailed Analysis:',
+          `• Cut: ${analysisObj.detailedAnalysis.cut}`,
+          `• Color: ${analysisObj.detailedAnalysis.color}`,
+          `• Clarity: ${analysisObj.detailedAnalysis.clarity}`,
+          `• Carat: ${analysisObj.detailedAnalysis.carat}`,
+          
+          // Notable Features section
+          '\nNotable Features:',
+          ...analysisObj.notableFeatures.map((feature: string) => `• ${feature}`),
+          
+          // Potential Concerns section
+          '\nPotential Concerns:',
+          ...analysisObj.potentialConcerns.map((concern: string) => `• ${concern}`),
+          
+          // Questions for Jeweler section
+          '\nQuestions to Consider:',
+          ...analysisObj.questionsForJeweler.map((question: string) => `• ${question}`)
+        ].join('\n')
+
+        // Set initial message
+        console.log('[Analysis Page] Setting initial message')
+        setMessages([{
+          id: 'initial',
+          content: sections,
+          role: 'assistant',
+          includeQuickQuestions: true
+        }])
+      } catch (err) {
+        console.error('[Analysis Page] Error formatting analysis:', err)
+        // Fallback to raw analysis if parsing fails
+        setMessages([{
+          id: 'initial',
+          content: typeof data.analysis === 'string' ? data.analysis : JSON.stringify(data.analysis, null, 2),
+          role: 'assistant',
+          includeQuickQuestions: true
+        }])
+      }
+
+      // Clear the stored data after a delay to ensure the page has loaded
+      console.log('[Analysis Page] Setting up delayed localStorage cleanup')
+      const cleanupTimeout = setTimeout(() => {
+        console.log('[Analysis Page] Clearing localStorage')
+        localStorage.removeItem('certificateData')
+      }, 1000)
+
+      // Cleanup timeout on unmount
+      return () => clearTimeout(cleanupTimeout)
+    } catch (err) {
+      console.error('[Analysis Page] Error parsing certificate data:', err)
+      router.push('/')
+    }
+  }, [router])
+
+  // Quick questions based on certificate data
+  const getQuickQuestions = () => {
+    if (!certificateData) return [];
+
+    const questions = [
+      'Can you explain more about the diamond\'s cut quality?',
+      'How does this color grade affect the diamond\'s appearance?',
+      'What are the key factors that determined this clarity grade?',
+      'How does this diamond compare to others with similar specifications?'
+    ];
+
+    // Add specific questions based on certificate data
+    if (certificateData.specs.type === 'Lab-Grown') {
+      questions.push('What are the main differences between lab-grown and natural diamonds?');
+    }
+
+    if (['SI1', 'SI2', 'I1', 'I2', 'I3'].includes(certificateData.specs.clarity)) {
+      questions.push('Are the inclusions visible to the naked eye?');
+    }
+
+    if (['D', 'E', 'F'].includes(certificateData.specs.color)) {
+      questions.push('What makes this diamond\'s color so exceptional?');
+    }
+
+    return questions;
+  };
 
   const handleSendMessage = async (content: string) => {
     // Add user message
@@ -68,37 +162,61 @@ What would you like to know more about?`,
     };
     setMessages(prev => [...prev, userMessage]);
     
-    // Simulate AI response
+    // Set typing indicator
     setIsTyping(true);
-    setTimeout(() => {
+
+    try {
+      // TODO: Implement actual API call to get AI response
+      // For now, just echo back the message after a delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: 'This is a mock AI response. Replace with actual AI integration.',
+        content: `You asked about: ${content}\n\nThis is a placeholder response. The AI integration will be implemented soon.`,
         role: 'assistant'
       };
+      
       setMessages(prev => [...prev, aiMessage]);
+    } catch (err) {
+      console.error('Error getting AI response:', err);
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        content: 'Sorry, I encountered an error. Please try again.',
+        role: 'assistant'
+      }]);
+    } finally {
       setIsTyping(false);
-    }, 1000);
+    }
   };
 
+  if (!certificateData) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="animate-pulse flex flex-col items-center justify-center h-64">
+          <div className="w-12 h-12 bg-gray-200 rounded-full mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-48"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Certificate Summary Card - Sidebar */}
-          <div className="lg:col-span-1">
-            <CertificateSummaryCard specs={mockCertificateData} />
-          </div>
-          
-          {/* Main Chat Area */}
-          <div className="lg:col-span-3 h-[800px]">
-            <ChatInterface
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              isTyping={isTyping}
-              quickQuestions={QUICK_QUESTIONS}
-            />
-          </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left column - Diamond specifications */}
+        <div className="lg:col-span-1">
+          <CertificateSummaryCard specs={certificateData.specs} />
+        </div>
+
+        {/* Right column - Chat interface */}
+        <div className="lg:col-span-2">
+          <ChatInterface
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            isTyping={isTyping}
+            quickQuestions={getQuickQuestions()}
+            certificateText={certificateData.rawText}
+          />
         </div>
       </div>
     </div>
