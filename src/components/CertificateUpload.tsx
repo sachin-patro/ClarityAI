@@ -130,26 +130,7 @@ export default function CertificateUpload({
       const formData = new FormData()
       formData.append('file', file)
 
-      // Try the simple-test endpoint first for testing
-      console.log('Testing POST to /api/simple-test...');
-      try {
-        const testResponse = await fetch('/api/simple-test', {
-          method: 'POST',
-          body: JSON.stringify({ test: 'data' }),
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        console.log('Test POST response:', testResponse.status, testResponse.statusText);
-        if (testResponse.ok) {
-          const testData = await testResponse.json();
-          console.log('Test POST data:', testData);
-        }
-      } catch (testErr) {
-        console.error('Error testing POST:', testErr);
-      }
-
-      // Try the pages API route
+      // Send request to analyze endpoint
       console.log('Sending request to /api/analyze')
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -171,6 +152,32 @@ export default function CertificateUpload({
             const errorData = await response.json();
             errorMessage = errorData.error || errorMessage;
             debugMessage += `, Error: ${JSON.stringify(errorData)}`;
+            
+            // If we have a text preview despite the error, show it
+            if (errorData.textPreview) {
+              const fallbackAnalysis = `
+1. Overview
+Failed to get AI analysis, but here's the extracted text:
+
+${errorData.textPreview}
+
+2. Detailed Analysis of 4Cs
+AI analysis unavailable.
+
+3. Notable Features
+Text extraction successful with ${errorData.textLength} characters.
+
+4. Potential Concerns
+Unable to perform AI analysis. Please try again later.
+
+5. Questions for the Jeweler
+Please ask about the details mentioned in the certificate.
+              `;
+              
+              if (onAnalysisComplete) {
+                onAnalysisComplete(fallbackAnalysis);
+              }
+            }
           } else {
             // Not JSON, try to get the response text
             const responseText = await response.text();
@@ -194,20 +201,24 @@ export default function CertificateUpload({
         throw new Error(errorMessage);
       }
 
-      // For the pages API route, we expect a JSON response
+      // Parse the JSON response
       const responseData = await response.json();
       console.log('Analysis response:', responseData);
       
-      // For now, just use the text preview as the analysis
-      if (responseData.textPreview) {
-        const analysisText = `
+      // Use the AI analysis if available, otherwise fall back to the text preview
+      if (responseData.analysis) {
+        if (onAnalysisComplete) {
+          onAnalysisComplete(responseData.analysis);
+        }
+      } else if (responseData.textPreview) {
+        const fallbackAnalysis = `
 1. Overview
 This is a diamond certificate with the following text extracted:
 
 ${responseData.textPreview}
 
 2. Detailed Analysis of 4Cs
-This is a preliminary analysis without AI processing.
+AI analysis unavailable.
 
 3. Notable Features
 Text extraction successful with ${responseData.textLength} characters.
@@ -220,10 +231,10 @@ Ask about the details mentioned in the certificate.
         `;
         
         if (onAnalysisComplete) {
-          onAnalysisComplete(analysisText);
+          onAnalysisComplete(fallbackAnalysis);
         }
       } else {
-        throw new Error('No text preview in the response');
+        throw new Error('No analysis or text preview in the response');
       }
     } catch (err) {
       console.error('Error analyzing certificate:', err)

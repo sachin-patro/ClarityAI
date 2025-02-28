@@ -90,13 +90,69 @@ export default async function handler(
       })
     }
 
-    // For testing purposes, just return the extracted text
-    return res.status(200).json({
-      message: 'PDF processed successfully',
-      textLength: certificateText.length,
-      textPreview: certificateText.substring(0, 500),
-    })
-    
+    try {
+      // Prepare the prompt for OpenAI
+      const prompt = `You are an expert diamond analyst. Analyze this diamond certificate and provide a detailed but easy-to-understand explanation of the diamond's characteristics. Focus on the 4Cs (Cut, Color, Clarity, and Carat) and highlight any notable features or concerns. Also suggest questions the buyer should ask the jeweler.
+
+Certificate text:
+${certificateText}
+
+Please structure your response in the following sections:
+1. Overview - A brief summary of the diamond's key characteristics
+2. Detailed Analysis of 4Cs - Break down each of the 4Cs and explain what they mean for this specific diamond
+3. Notable Features - Highlight any special characteristics or unique aspects
+4. Potential Concerns - Point out any areas that might need attention or further investigation
+5. Questions for the Jeweler - Suggest specific questions based on the certificate details
+
+For each section, use plain language that a non-expert can understand. If you notice any unusual or noteworthy specifications, explain their significance.`
+
+      // Call OpenAI API
+      console.log('Calling OpenAI API...')
+      const completion = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4-turbo-preview',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert diamond analyst helping customers understand diamond certificates.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 2000,
+        }),
+      })
+
+      if (!completion.ok) {
+        throw new Error(`OpenAI API error: ${completion.status} ${completion.statusText}`)
+      }
+
+      const result = await completion.json()
+      const analysis = result.choices[0].message.content
+
+      // Return both the analysis and the raw text
+      return res.status(200).json({
+        message: 'Certificate analyzed successfully',
+        analysis: analysis,
+        textLength: certificateText.length,
+        textPreview: certificateText.substring(0, 500),
+      })
+    } catch (openaiError) {
+      console.error('Error calling OpenAI API:', openaiError)
+      return res.status(500).json({
+        error: 'Failed to analyze the certificate with AI. Please try again later.',
+        textLength: certificateText.length,
+        textPreview: certificateText.substring(0, 500),
+      })
+    }
   } catch (error) {
     console.error('Error processing certificate:', error)
     return res.status(500).json({ error: 'Failed to process certificate' })
