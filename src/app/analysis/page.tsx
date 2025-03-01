@@ -33,6 +33,26 @@ export default function AnalysisPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [conversationContext, setConversationContext] = useState<Message[]>([]);
 
+  // Add logging for message state changes
+  useEffect(() => {
+    console.log('[Analysis Page] Messages state changed:', messages.map(m => ({
+      id: m.id,
+      role: m.role,
+      isInitial: m.includeQuickQuestions,
+      contentPreview: m.content.slice(0, 30)
+    })));
+  }, [messages]);
+
+  // Add logging for conversation context changes
+  useEffect(() => {
+    console.log('[Analysis Page] Conversation context changed:', conversationContext.map(m => ({
+      id: m.id,
+      role: m.role,
+      isInitial: m.includeQuickQuestions,
+      contentPreview: m.content.slice(0, 30)
+    })));
+  }, [conversationContext]);
+
   useEffect(() => {
     // Get certificate data from localStorage
     console.log('[Analysis Page] Initializing analysis page')
@@ -185,59 +205,79 @@ Specifications:
       role: 'user'
     };
     
+    console.log('[Analysis Page] handleSendMessage - Adding user message:', {
+      id: userMessage.id,
+      content: userMessage.content.slice(0, 30),
+      currentMessageCount: messages.length
+    });
+    
     // Add the new message while preserving all existing messages
-    setMessages(prev => [...prev, userMessage]);
+    setMessages(prev => {
+      console.log('[Analysis Page] handleSendMessage - Previous messages:', prev.length);
+      const newMessages = [...prev, userMessage];
+      console.log('[Analysis Page] handleSendMessage - New messages:', newMessages.length);
+      console.log('[Analysis Page] handleSendMessage - ADDED USER MESSAGE with ID:', userMessage.id);
+      return newMessages;
+    });
     
     // Update conversation context
-    setConversationContext(prev => [...prev, userMessage]);
+    setConversationContext(prev => {
+      const newContext = [...prev, userMessage];
+      console.log('[Analysis Page] handleSendMessage - Updated context:', newContext.length);
+      return newContext;
+    });
+    
     setIsTyping(true);
   };
   
   const handleNewAssistantMessage = (message: Message) => {
+    console.log('[Analysis Page] handleNewAssistantMessage - Received new assistant message:', {
+      id: message.id,
+      contentPreview: message.content.slice(0, 30),
+      isInitial: message.includeQuickQuestions
+    });
+    
     setMessages(prev => {
-      console.log('[Analysis Page] Current messages:', prev.map(m => ({
+      // Log all messages before processing
+      console.log('[Analysis Page] Previous messages:', prev.map(m => ({
         id: m.id,
         role: m.role,
         isInitial: m.includeQuickQuestions,
-        contentPreview: m.content.slice(0, 50)
+        contentPreview: m.content.slice(0, 30)
       })));
 
-      // Find the last non-initial assistant message
-      const lastAssistantIndex = [...prev].reverse().findIndex(m => 
-        m.role === 'assistant' && !m.includeQuickQuestions
-      );
+      // Check if this message already exists in our messages array (streaming update)
+      const existingMessageIndex = prev.findIndex(m => m.id === message.id);
       
-      console.log('[Analysis Page] Last assistant index:', lastAssistantIndex);
-      
-      if (lastAssistantIndex >= 0) {
-        // Convert back to normal array index
-        const actualIndex = prev.length - 1 - lastAssistantIndex;
-        console.log('[Analysis Page] Updating message at index:', actualIndex);
-        
-        // Replace the last assistant message with the new one
+      // If this is a streaming update to an existing message
+      if (existingMessageIndex >= 0) {
+        // Create a new array with the updated message
         const newMessages = [...prev];
-        newMessages[actualIndex] = message;
+        newMessages[existingMessageIndex] = message;
+        
+        console.log('[Analysis Page] Updating existing message at index:', existingMessageIndex);
         return newMessages;
-      }
+      } 
       
-      console.log('[Analysis Page] Appending new assistant message');
-      // If no assistant message found, append the new one
+      // If this is a new message, simply append it to the end
+      console.log('[Analysis Page] Adding new assistant message');
       return [...prev, message];
     });
     
+    // Update conversation context with the same approach
     setConversationContext(prev => {
-      console.log('[Analysis Page] Updating conversation context, current length:', prev.length);
-      // Similarly update the conversation context
-      const lastAssistantIndex = [...prev].reverse().findIndex(m => 
-        m.role === 'assistant' && !m.includeQuickQuestions
-      );
+      // Check if this message already exists in our context array (streaming update)
+      const existingMessageIndex = prev.findIndex(m => m.id === message.id);
       
-      if (lastAssistantIndex >= 0) {
-        const actualIndex = prev.length - 1 - lastAssistantIndex;
+      // If this is a streaming update to an existing message
+      if (existingMessageIndex >= 0) {
+        // Create a new array with the updated message
         const newContext = [...prev];
-        newContext[actualIndex] = message;
+        newContext[existingMessageIndex] = message;
         return newContext;
-      }
+      } 
+      
+      // If this is a new message, simply append it to the end
       return [...prev, message];
     });
     

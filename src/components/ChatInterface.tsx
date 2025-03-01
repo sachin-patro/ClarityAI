@@ -29,7 +29,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 }) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [responseStarted, setResponseStarted] = useState(false);
+  const [localUserMessage, setLocalUserMessage] = useState<Message | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Add logging for message props changes
+  useEffect(() => {
+    console.log('[Chat Interface] Messages prop changed:', messages.map(m => ({
+      id: m.id,
+      role: m.role,
+      isInitial: m.includeQuickQuestions,
+      contentPreview: m.content.slice(0, 30)
+    })));
+    
+    // Reset local user message if it's been added to the messages prop
+    if (localUserMessage && messages.some(m => 
+      m.content === localUserMessage.content && 
+      m.role === 'user')) {
+      setLocalUserMessage(null);
+    }
+  }, [messages, localUserMessage]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -53,39 +72,78 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       return;
     }
     
+    // Generate a single message ID for this entire conversation turn
+    const assistantMessageId = Date.now().toString();
+    console.log('[Chat Interface] Created new assistant message ID:', assistantMessageId);
+    
     console.log('[Chat Interface] Sending message:', messageToSend);
-    console.log('[Chat Interface] Current messages:', messages.map(m => ({
-      id: m.id,
-      role: m.role,
-      isInitial: m.includeQuickQuestions,
-      contentPreview: m.content.slice(0, 50)
-    })));
+    const initialMessage = messages.find(m => m.includeQuickQuestions);
+    console.log('[Chat Interface] Initial message:', initialMessage ? {
+      id: initialMessage.id,
+      contentPreview: initialMessage.content.slice(0, 50),
+      isInitial: true
+    } : 'None');
 
     setInput('');
     setIsLoading(true);
+    setResponseStarted(false);
+
+    // Create a local user message to display immediately
+    const userMessage: Message = {
+      id: 'local-' + Date.now().toString(),
+      content: messageToSend,
+      role: 'user'
+    };
+    setLocalUserMessage(userMessage);
 
     // Notify parent about the user message first
+    console.log('[Chat Interface] STEP 1: Calling onSendMessage with:', messageToSend);
     onSendMessage(messageToSend);
 
-    // Convert messages to the format expected by the API
+    // Wait a tick for the message state to update
+    console.log('[Chat Interface] STEP 2: Waiting for state update...');
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Log messages after user message is added
+    console.log('[Chat Interface] STEP 3: Messages after waiting (should include user message):', 
+      messages.map(m => ({
+        id: m.id,
+        role: m.role,
+        contentPreview: m.content.slice(0, 30)
+      }))
+    );
+
+    // Convert messages to the format expected by the API, including ALL messages
     const conversationHistory = messages.map(msg => ({
       role: msg.role,
       content: msg.content
     }));
     
     try {
-      console.log('[Chat Interface] Making API request with history:', conversationHistory.length);
+      console.log('[Chat Interface] Making API request with history:', {
+        messageCount: conversationHistory.length,
+        messages: conversationHistory.map(m => ({
+          role: m.role,
+          contentPreview: m.content.slice(0, 30),
+          isInitial: m.role === 'assistant' && m.content.includes('Detailed Analysis')
+        }))
+      });
+
+      // Log the full request payload for debugging
+      const requestPayload = {
+        message: messageToSend,
+        certificateText,
+        stream: true,
+        conversationHistory
+      };
+      console.log('[Chat Interface] Full request payload:', JSON.stringify(requestPayload).slice(0, 500) + '...');
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          message: messageToSend,
-          certificateText,
-          stream: true,
-          conversationHistory
-        })
+        body: JSON.stringify(requestPayload)
       });
 
       console.log('[Chat Interface] API response status:', response.status);
@@ -125,16 +183,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               const content = parsed.choices[0]?.delta?.content || '';
               accumulatedResponse += content;
               
+              // Mark that we've started receiving a response
+              if (!responseStarted && content) {
+                setResponseStarted(true);
+                // Clear local user message when response starts
+                setLocalUserMessage(null);
+              }
+              
               // Update the message in real-time
               if (content && onNewAssistantMessage) {
                 const newMessage = {
-                  id: Date.now().toString(),
+                  id: assistantMessageId,
                   content: accumulatedResponse,
-                  role: 'assistant' as const
+                  role: 'assistant' as const,
+                  includeQuickQuestions: false // Explicitly mark as not initial
                 };
                 console.log('[Chat Interface] Updating assistant message:', {
                   id: newMessage.id,
-                  contentPreview: newMessage.content.slice(0, 50)
+                  contentPreview: newMessage.content.slice(0, 50),
+                  isInitial: false
                 });
                 onNewAssistantMessage(newMessage);
               }
@@ -148,13 +215,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       console.error('[Chat Interface] Error in chat request:', err);
       if (onNewAssistantMessage) {
         onNewAssistantMessage({
-          id: Date.now().toString(),
+          id: assistantMessageId,
           content: 'Sorry, I encountered an error. Please try again.',
-          role: 'assistant'
+          role: 'assistant' as const,
+          includeQuickQuestions: false
         });
       }
     } finally {
       setIsLoading(false);
+      setResponseStarted(false);
     }
   };
 
@@ -193,9 +262,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-lg h-[800px] flex flex-col">
+      {/* Log messages being rendered */}
+      {(() => {
+        console.log('[Chat Interface] Rendering messages:', messages.map(m => ({
+          id: m.id,
+          role: m.role,
+          isInitial: m.includeQuickQuestions,
+          contentPreview: m.content.slice(0, 30)
+        })));
+        return null;
+      })()}
+      
       {/* Messages container */}
       <div className="flex-1 overflow-y-auto p-6">
-        {messages.map((message) => (
+        {/* Combine messages from props with local user message if it's not already included */}
+        {[...messages, ...(localUserMessage && !messages.some(m => m.content === localUserMessage.content && m.role === 'user') ? [localUserMessage] : [])].map((message) => (
           <div
             key={message.id}
             className={`mb-4 ${
@@ -241,8 +322,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
         ))}
         
-        {/* Loading indicator */}
-        {isLoading && (
+        {/* Loading indicator - only show if loading and response hasn't started yet */}
+        {isLoading && !responseStarted && (
           <div className="mr-12 mb-4">
             <div className="bg-blue-50 text-blue-900 rounded-lg p-4">
               <div className="flex space-x-2">
