@@ -129,14 +129,25 @@ export default function AnalysisPage() {
           {
             id: 'system',
             content: `You are a diamond expert analyzing this certificate. Here's what you know about it:
-            
+
 Certificate Type: ${data.specs.laboratory} ${data.specs.type} Diamond Certificate
 Certificate Number: ${data.specs.certificateNumber}
+
 Specifications:
-- Carat: ${data.specs.carat}
-- Color: ${data.specs.color}
-- Clarity: ${data.specs.clarity}
-- Cut: ${data.specs.cut}`,
+• Carat Weight: ${data.specs.carat}
+• Color Grade: ${data.specs.color}
+• Clarity Grade: ${data.specs.clarity}
+• Cut Grade: ${data.specs.cut}
+
+Your role is to help users understand this specific diamond's characteristics, quality, and value. When answering questions:
+1. Always refer to the specific details of this diamond
+2. Explain how each characteristic impacts this diamond's quality and value
+3. Provide context about why certain grades or features matter
+4. Make comparisons when relevant to help users understand
+5. Be specific about this diamond rather than giving general diamond information
+
+Raw certificate text for additional details:
+${data.rawText}`,
             role: 'assistant'
           },
           initialMessage
@@ -154,16 +165,6 @@ Specifications:
         setMessages([fallbackMessage]);
         setConversationContext([fallbackMessage]);
       }
-
-      // Clear the stored data after a delay to ensure the page has loaded
-      console.log('[Analysis Page] Setting up delayed localStorage cleanup')
-      const cleanupTimeout = setTimeout(() => {
-        console.log('[Analysis Page] Clearing localStorage')
-        localStorage.removeItem('certificateData')
-      }, 1000)
-
-      // Cleanup timeout on unmount
-      return () => clearTimeout(cleanupTimeout)
     } catch (err) {
       console.error('[Analysis Page] Error parsing certificate data:', err)
       router.push('/')
@@ -205,79 +206,21 @@ Specifications:
       role: 'user'
     };
     
-    console.log('[Analysis Page] handleSendMessage - Adding user message:', {
-      id: userMessage.id,
-      content: userMessage.content.slice(0, 30),
-      currentMessageCount: messages.length
-    });
-    
-    // Add the new message while preserving all existing messages
-    setMessages(prev => {
-      console.log('[Analysis Page] handleSendMessage - Previous messages:', prev.length);
-      const newMessages = [...prev, userMessage];
-      console.log('[Analysis Page] handleSendMessage - New messages:', newMessages.length);
-      console.log('[Analysis Page] handleSendMessage - ADDED USER MESSAGE with ID:', userMessage.id);
-      return newMessages;
-    });
-    
-    // Update conversation context
-    setConversationContext(prev => {
-      const newContext = [...prev, userMessage];
-      console.log('[Analysis Page] handleSendMessage - Updated context:', newContext.length);
-      return newContext;
-    });
-    
+    // Simply append the user message to the messages array
+    setMessages(prev => [...prev, userMessage]);
     setIsTyping(true);
   };
   
   const handleNewAssistantMessage = (message: Message) => {
-    console.log('[Analysis Page] handleNewAssistantMessage - Received new assistant message:', {
-      id: message.id,
-      contentPreview: message.content.slice(0, 30),
-      isInitial: message.includeQuickQuestions
-    });
-    
+    // If this is a new message, append it
+    // If it's an update to an existing message (streaming), update that message
     setMessages(prev => {
-      // Log all messages before processing
-      console.log('[Analysis Page] Previous messages:', prev.map(m => ({
-        id: m.id,
-        role: m.role,
-        isInitial: m.includeQuickQuestions,
-        contentPreview: m.content.slice(0, 30)
-      })));
-
-      // Check if this message already exists in our messages array (streaming update)
-      const existingMessageIndex = prev.findIndex(m => m.id === message.id);
-      
-      // If this is a streaming update to an existing message
-      if (existingMessageIndex >= 0) {
-        // Create a new array with the updated message
+      const existingIndex = prev.findIndex(m => m.id === message.id);
+      if (existingIndex >= 0) {
         const newMessages = [...prev];
-        newMessages[existingMessageIndex] = message;
-        
-        console.log('[Analysis Page] Updating existing message at index:', existingMessageIndex);
+        newMessages[existingIndex] = message;
         return newMessages;
-      } 
-      
-      // If this is a new message, simply append it to the end
-      console.log('[Analysis Page] Adding new assistant message');
-      return [...prev, message];
-    });
-    
-    // Update conversation context with the same approach
-    setConversationContext(prev => {
-      // Check if this message already exists in our context array (streaming update)
-      const existingMessageIndex = prev.findIndex(m => m.id === message.id);
-      
-      // If this is a streaming update to an existing message
-      if (existingMessageIndex >= 0) {
-        // Create a new array with the updated message
-        const newContext = [...prev];
-        newContext[existingMessageIndex] = message;
-        return newContext;
-      } 
-      
-      // If this is a new message, simply append it to the end
+      }
       return [...prev, message];
     });
     
@@ -312,6 +255,7 @@ Specifications:
             isTyping={isTyping}
             quickQuestions={getQuickQuestions()}
             certificateText={certificateData.rawText}
+            certificateSpecs={certificateData.specs}
           />
         </div>
       </div>
