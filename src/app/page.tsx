@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import CertificateUpload from '../components/CertificateUpload'
+import FloatingDiamonds from '../components/FloatingDiamonds'
 
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
@@ -13,7 +14,7 @@ const fadeIn = {
 const benefits = [
   {
     icon: "🔍",
-    text: "Decode technical jargon into simple explanations"
+    text: "Translate confusing diamond lingo into plain English"
   },
   {
     icon: "💎",
@@ -38,11 +39,11 @@ const steps = [
   {
     number: "2",
     title: "Our AI analyzes the diamond specifications",
-    description: "Advanced algorithms process every detail of your diamond"
+    description: "Advanced AI models process every detail of your diamond"
   },
   {
     number: "3",
-    title: "Receive plain-English explanation",
+    title: "Receive a plain-English explanation",
     description: "Get clear insights and smart shopping advice"
   }
 ]
@@ -56,6 +57,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <FloatingDiamonds />
       {/* Hero Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -79,13 +81,13 @@ export default function Home() {
               {benefits.map((benefit, index) => (
                 <motion.div 
                   key={index}
-                  className="flex items-center space-x-3 bg-white p-4 rounded-lg shadow-sm"
+                  className="flex items-center space-x-4 bg-white p-5 rounded-lg shadow-sm"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
                 >
-                  <span className="text-2xl">{benefit.icon}</span>
-                  <span className="text-gray-700">{benefit.text}</span>
+                  <span className="text-3xl">{benefit.icon}</span>
+                  <span className="text-gray-700 text-lg">{benefit.text}</span>
                 </motion.div>
               ))}
             </div>
@@ -125,8 +127,8 @@ export default function Home() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.2 }}
               >
-                <div className="bg-[#4361ee]/5 p-6 rounded-lg">
-                  <div className="flex items-center justify-center w-12 h-12 bg-[#4361ee] text-white rounded-full mb-4">
+                <div className="bg-blue-50 p-6 rounded-lg">
+                  <div className="flex items-center justify-center w-12 h-12 bg-blue-500 text-white rounded-full mb-4">
                     {step.number}
                   </div>
                   <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
