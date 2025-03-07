@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import CertificateUpload from '../components/CertificateUpload'
+import LoadingScreen from '../components/LoadingScreen'
 
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
@@ -56,6 +57,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
+      {isAnalyzing && <LoadingScreen />}
       {/* Content */}
       <div className="relative">
         {/* Hero Section */}
