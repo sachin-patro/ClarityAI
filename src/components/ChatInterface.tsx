@@ -174,10 +174,10 @@ ${certificateText}`
         );
       }
       
-      // Handle numbered sections (e.g., "1. Overview")
-      if (/^\d+\./.test(line)) {
+      // Handle section headers (lines ending with ':')
+      if (line.trim().endsWith(':')) {
         return (
-          <h3 key={index} className="font-semibold text-lg mt-4 mb-2">
+          <h3 key={index} className="font-semibold mt-4 mb-2">
             {line.trim()}
           </h3>
         );
