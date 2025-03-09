@@ -6,7 +6,7 @@ import Navigation from '@/components/Navigation';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Diamond Certificate Analyzer',
+  title: 'DiamondAI',
   description: 'Upload your diamond certificate and get an easy-to-understand analysis of your diamond\'s specifications.',
 };
 
