@@ -22,7 +22,6 @@ prisma/migrations/dev/
 src/app/api/test/
 src/app/api/test-route.ts
 src/app/api/simple-test/
-src/app/api/pdf-analysis/
 
 # OS files
 .DS_Store
@@ -39,3 +38,4 @@ yarn-error.log*
 .idea/
 *.swp
 *.swo
+.vercel
