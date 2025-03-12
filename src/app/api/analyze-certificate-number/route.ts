@@ -49,7 +49,7 @@ Please structure your response in the following sections:
 
     // Get streaming response from OpenAI
     const response = await openai.createChatCompletion({
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'system',

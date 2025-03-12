@@ -98,7 +98,7 @@ export async function createChatCompletion(
     console.log('[Chat Lib] Sending messages to OpenAI:', messages.length);
     
     const response = await openai.createChatCompletion({
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o',
       messages,
       temperature: 0.7,
       max_tokens: 800,
