@@ -6,5 +6,11 @@
     "src/pages/api/analyze.ts": {
       "maxDuration": 60
     }
-  }
+  },
+  "routes": [
+    {
+      "source": "/api/analyze-certificate",
+      "destination": "/api/analyze-certificate"
+    }
+  ]
 } 

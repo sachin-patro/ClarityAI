@@ -3,8 +3,7 @@ import { StreamingTextResponse, OpenAIStream } from 'ai'
 import { Configuration, OpenAIApi } from 'openai-edge'
 import pdfParse from 'pdf-parse'
 
-// Configure for edge runtime
-export const runtime = 'edge'
+// Set maximum duration without edge runtime
 export const maxDuration = 60
 
 // Initialize OpenAI configuration
