@@ -8,6 +8,8 @@ import { createReadStream } from 'fs'
 export const config = {
   api: {
     bodyParser: false,
+    responseLimit: false,
+    maxDuration: 60
   },
 }
 
@@ -139,7 +141,7 @@ Extract all specifications precisely as they appear in the certificate. For the 
           'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'gpt-4-turbo-preview',
+          model: 'gpt-4o',
           messages: [
             {
               role: 'system',

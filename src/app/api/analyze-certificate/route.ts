@@ -3,6 +3,10 @@ import { StreamingTextResponse, OpenAIStream } from 'ai'
 import { Configuration, OpenAIApi } from 'openai-edge'
 import pdfParse from 'pdf-parse'
 
+// Configure for edge runtime
+export const runtime = 'edge'
+export const maxDuration = 60
+
 // Initialize OpenAI configuration
 const config = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
@@ -124,7 +128,7 @@ Provide some questions for the user to ask their jeweler about the diamond, to a
       // Get streaming response from OpenAI
       console.log('Sending request to OpenAI with API key:', process.env.OPENAI_API_KEY?.substring(0, 5) + '...')
       const response = await openai.createChatCompletion({
-        model: 'gpt-4-turbo-preview',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',

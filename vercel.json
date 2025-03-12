@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "src/app/api/analyze-certificate/route.ts": {
+      "maxDuration": 60
+    },
+    "src/pages/api/analyze.ts": {
+      "maxDuration": 60
+    }
+  }
+} 
