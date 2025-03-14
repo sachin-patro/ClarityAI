@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import Navigation from '@/components/Navigation';
+import Footer from '@/components/Footer';
 import Script from 'next/script'; // Import the next/script component
 
 const inter = Inter({ subsets: ['latin'] });
@@ -29,11 +30,12 @@ export default function RootLayout({
       <head>
         {/* Head can remain empty or include metadata if needed */}
       </head>
-      <body className={`${inter.className} bg-blue-50`}>
+      <body className={`${inter.className} bg-blue-50 flex flex-col min-h-screen`}>
         <Navigation />
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 py-8 flex-grow">
           {children}
         </main>
+        <Footer />
 
         {/* Google Analytics using next/script */}
         <Script

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import CertificateUpload from '../components/CertificateUpload'
 import LoadingScreen from '../components/LoadingScreen'
+import { useRouter } from 'next/navigation'
 
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
@@ -48,11 +49,72 @@ const steps = [
   }
 ]
 
+const sampleCertificateData = {
+  analysis: JSON.stringify({
+    overview: "This is a high-quality 1-carat round brilliant diamond with excellent proportions and exceptional color.",
+    detailedAnalysis: {
+      cut: "The Excellent cut grade indicates optimal light performance and sparkle.",
+      color: "D color grade represents the highest and most rare color grade, completely colorless.",
+      clarity: "VS1 clarity means the diamond is very slightly included, but inclusions are difficult to see under 10x magnification.",
+      carat: "At 1.01 carats, this is a classic size that balances presence and value."
+    },
+    notableFeatures: [
+      "Excellent symmetry and polish",
+      "Ideal proportions for maximum brilliance",
+      "No fluorescence, ensuring consistent appearance"
+    ],
+    potentialConcerns: [
+      "Premium pricing due to D color grade",
+      "Consider if the premium for D color is worth it over an F or G color"
+    ],
+    questionsForJeweler: [
+      "Can you show me how this diamond looks in different lighting conditions?",
+      "What is the price premium for D color versus F color?",
+      "Can you show me the diamond's light performance under an ASET scope?"
+    ]
+  }),
+  specs: {
+    carat: 1.01,
+    color: "D",
+    clarity: "VS1",
+    cut: "Excellent",
+    certificateNumber: "0123456789",
+    laboratory: "GIA",
+    type: "Natural"
+  },
+  rawText: `
+ROUND BRILLIANT CUT DIAMOND
+Shape and Cutting Style: ROUND BRILLIANT
+Measurements: 6.61 - 6.64 x 4.05 MM
+Carat Weight: 1.01 carat
+Color Grade: D
+Clarity Grade: VS1
+Cut Grade: EXCELLENT
+Polish: EXCELLENT
+Symmetry: EXCELLENT
+Fluorescence: NONE
+  `
+};
+
 export default function Home() {
+  const router = useRouter()
   const [isAnalyzing, setIsAnalyzing] = useState(false)
 
   const handleAnalysisStart = () => {
     setIsAnalyzing(true)
+  }
+
+  const handleViewSample = () => {
+    // Show loading screen
+    setIsAnalyzing(true)
+    
+    // Store sample data in localStorage
+    localStorage.setItem('certificateData', JSON.stringify(sampleCertificateData))
+    
+    // Wait 3 seconds before redirecting
+    setTimeout(() => {
+      router.push('/analysis')
+    }, 3000)
   }
 
   return (
@@ -103,6 +165,15 @@ export default function Home() {
               variants={fadeIn}
             >
               <CertificateUpload onAnalysisStart={handleAnalysisStart} />
+              <div className="mt-6 text-center">
+                <button
+                  onClick={handleViewSample}
+                  className="bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-700 hover:to-blue-500 text-white font-medium text-2xl py-3 px-6 rounded-lg w-full transition-all duration-200 flex items-center justify-center space-x-2"
+                >
+                  <span>👀</span>
+                  <span>See a sample analysis first</span>
+                </button>
+              </div>
             </motion.div>
           </div>
         </div>
