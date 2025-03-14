@@ -47,7 +47,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   useEffect(() => {
-    scrollToBottom();
+    // Only scroll if there's more than one message (initial analysis doesn't need scroll)
+    // Or if we're typing (new message coming in)
+    if (messages.length > 1 || isTyping) {
+      scrollToBottom();
+    }
   }, [messages, isTyping]);
 
   const handleSubmit = async (e: React.FormEvent, messageOverride?: string) => {
